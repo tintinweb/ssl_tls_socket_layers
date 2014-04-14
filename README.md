@@ -11,15 +11,16 @@ no dependencies
 work in progress...
 
 
-TODO:    
-    * proto description with class only.. no serialize/unserialize
-    * get rid of utils.serialize
-    * move hexdump to layer
-    * allow cross proto manipulations
-        * upper layer accesses lower layer to set own fields
-    * only serialize once
-        * dirty bits? serialize on update or only on read op
-    * match protocol based on layer descriptions
+TODO    
+-----
+* proto description with class only.. no serialize/unserialize
+* get rid of utils.serialize
+* move hexdump to layer
+* allow cross proto manipulations
+    * upper layer accesses lower layer to set own fields
+* only serialize once
+    * dirty bits? serialize on update or only on read op
+* match protocol based on layer descriptions
     
     
  - tintin
