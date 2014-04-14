@@ -1,7 +1,7 @@
 
 
-from src.utils import *
-from src.layer import *
+from utils import *
+from layer import *
 
 
 class TLSRecord(Layer):    

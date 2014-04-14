@@ -1,6 +1,6 @@
 
 import socket, time, select
-from  src.layer import *
+from  layer import *
 
 class BaseSocket(object):
     def __init__(self, ip, port, timeout=2, buffer=2048):
