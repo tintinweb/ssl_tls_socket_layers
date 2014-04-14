@@ -1,4 +1,7 @@
+'''
+@author: tintinweb
 
+'''
 import socket, time, select
 from  layer import *
 

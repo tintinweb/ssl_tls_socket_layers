@@ -1,15 +1,8 @@
 '''
 Created on Apr 13, 2014
 
-@author: martin
-'''
-from utils import *
-from layer.ssl.tls import *
-from layer.base import Raw,TCP,UDP
+@author: tintinweb
 
-import sys
-
-'''
 TODO:    
     * proto description with class only.. no serialize/unserialize
     * get rid of utils.serialize
@@ -20,6 +13,13 @@ TODO:
         * dirty bits? serialize on update or only on read op
     * match protocol based on layer descriptions
 '''
+from utils import *
+from layer.ssl.tls import *
+from layer.base import Raw,TCP,UDP
+
+import sys
+
+
 
 def main(opts):
     ip = opts['ip']
@@ -44,10 +44,6 @@ def main(opts):
     hexdump_squashed(resp) 
     print repr(TLSRecord(__raw=resp))
     
-    
-
-
-
 
 if __name__=="__main__":
     opts = {'ip':'172.16.0.55',

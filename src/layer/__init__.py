@@ -1,7 +1,9 @@
+'''
+@author: tintinweb
+
+'''
 from collections import OrderedDict
 import struct
-
-
 
 class FieldDict(OrderedDict):
     'Store items in the order the keys were last added'
