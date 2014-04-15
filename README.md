@@ -44,7 +44,7 @@ Idea
 	# build valid TLS 1.0 Record with TLS 1.1 Handshake
 	#  + append extensions defined above
 	#  + autocalculates all other fields
-	p = TLSRecord(version=0x0301)/TLSHandshake(version=0x0302, extensions=ext)
+	p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(version=TLSRecord.PROTOCOL_TLS_1_1, extensions=ext)
 	print tcp/Raw(data=p.serialize())
 	
 	

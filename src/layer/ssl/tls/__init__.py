@@ -10,11 +10,15 @@ import time, os
 class TLSRecord(Layer):   
     TYPE_HANDSHAKE = 22 
     
+    PROTOCOL_TLS_1_0 = 0x0301
+    PROTOCOL_TLS_1_1 = 0x0302
+    PROTOCOL_TLS_1_2 = 0x0303
+    
     def _definition(self):
         # fields and their wire-definition
         # in order!
         self.add_field(name='content_type', struct='!B', default=self.next_magic)
-        self.add_field(name='version', struct='!H', default=0x0302)
+        self.add_field(name='version', struct='!H', default=self.PROTOCOL_TLS_1_0)
         self.add_field(name='length', struct='!H', default=self.next_size)
         
 class TLSHandshake(Layer):
@@ -37,9 +41,9 @@ class TLSHandshake(Layer):
     def _definition(self):
         
         self.add_field(name='type', struct='!B', default=self.TYPE_CLIENT_HELLO)          #client hello
-        self.add_field(name='length_hi', struct='!B', default=0x00)
+        self.add_field(name='length_hi', struct='!B', default=0x00)  #fix!
         self.add_field(name='length', struct='!H', default=self.get_handshake_size) #142-4
-        self.add_field(name='version', struct='!H', default=0x0302)
+        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
         #
         self.add_field(name='random', default=TLSPropRandom().serialize)
         #
