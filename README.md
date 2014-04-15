@@ -24,3 +24,18 @@ TODO
     
     
  - tintin
+ 
+ 
+ 	# example: layered TLS messages on top of ordinary sockets
+ 	#
+	tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)	# response buffer
+	
+	# build extension list
+	ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList()+
+	                                    TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20))
+	
+	# build valid TLS 1.0 Record with TLS 1.1 Handshake
+	#  + append extensions defined above
+	#  + autocalculates all other fields
+	p = TLSRecord(version=0x0301, content_type=0x16)/TLSHandshake(version=0x0302, extensions=ext)
+	print tcp/Raw(data=p.serialize())
