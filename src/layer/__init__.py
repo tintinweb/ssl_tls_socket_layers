@@ -22,18 +22,22 @@ class Field(object):
     def set(self, value):
         self.value = value
         
-    def get(self):
+    def get(self, value=None):
+        print "[F] ->"+self.name
         ret=''
-        value = self.value or self.default
-        print isinstance(value, Layer)
-        if hasattr(value,"__call__"):   # is function?
-            ret = value()
+        value = value if value!=None else (self.value or self.default)
+        if isinstance(value, Layer) or isinstance(value,CompoundLayer):  # serialize this layer
+            print "[F] isinstance"
+            ret = value.serialize()
+        elif hasattr(value,"__call__"):   # is function?
+            print "[F] val"
+            ret = self.get(value())
         elif isinstance(value, list):   # list? serialize and join
+            print "[F] list"
             for e in value:
                 ret+=self.get(e)        # deref/serialize list items
-        elif isinstance(value, Layer):  # serialize this layer
-            ret = value.serialize()
         else:
+            print "[F] raw"
             ret = value
                 
         return ret
@@ -58,13 +62,31 @@ class Field(object):
     def __len__(self):
         return len(self.serialize())
 
+
 class Layer(object):
+    class NoneLayer(object):
+        '''
+        dummy termination layer
+        '''
+        def __init__(self):
+            self.length=0
+        def size(self):
+            print "DUMMY"
+            return self.length
+        def magic(self):
+            print "DUMMY_TYPE"
+            return 0xcc
+        def next_size(self):
+            raise
+        def next_magic(self):
+            raise
+        
     def __init__(self, **kwargs):
-        self.next = None            # previous -- linked by / operator
+        self.next = Layer.NoneLayer()           # previous -- linked by / operator
         self.next_layer_len=0
-        self.curr_layer_len=0
-        self.prev = None            # next layer
-        self.data_serialized = ''   # last serialized data
+        self.length=0
+        self.prev = None                        # next layer
+        self.data_serialized = False            # dirty bit - data last serialized
         self.fields=OrderedDict()
         self._definition()
         # load params
@@ -83,18 +105,45 @@ class Layer(object):
     def __div__(self, other):
         self.next = other
         other.prev = self
-        #print "%s/%s"%(repr(self),repr(other))
-        return other
+        print "%s/%s"%(repr(self),repr(other))
+        print "--div--"
+        print str(self)
+        print str(self.next)
+        return CompoundLayerDiv(self,other)
+
+    def __add__(self, other):
+        # list of elements that do not modify each other
+        return CompoundLayerAdd(self,other)
         
     def next_len(self):
         return self.next_layer_len
     
     def curr_len(self):
-        return self.curr_layer_len
+        return self.length
+    
+    def size(self):
+        return self.length
+    
+    def magic(self):
+        return self.MAGIC
+    
+    def next_magic(self):
+        return self.next.magic()
+    
+    def next_size(self):
+        print "next_size:",self.next.__class__.__name__
+        return self.next.size()
 
     def serialize(self):
-        print self.__class__.__name__
-        self.data_serialized = "".join([field.serialize() for field in self.fields.values()]) 
+        # todo add caching,call functions after all other fields were set or prioritize
+        if False and self.data_serialized:
+            return self.data_serialized
+        print "[L]"+self.__class__.__name__
+        #self.data_serialized = "".join([field.serialize() for field in self.fields.values()]) 
+        self.data_serialized = ''
+        for field in self.fields.values():
+            print "[L]"+ field.name
+            self.data_serialized += field.serialize()
         return self.data_serialized
     
     def unserialize(self, data):
@@ -110,7 +159,7 @@ class Layer(object):
     def __str__(self):
         return self.serialize()
     
-    def __repr__(self):
+    def __repsr__(self):
         str = "[ %s ]\n  "%self.__class__.__name__
         str += "\n  ".join([repr(f) for f in self.fields.values()])
         return str
@@ -121,26 +170,71 @@ class Layer(object):
     
     def total_len(self):
         return len(self)+self.next_len()
+
     
-    
+from utils import *    
 class CompoundLayer(object):
+    '''
+    
+    track and handle /concatenations and provide interface for easy serialization
+    
+    '''
+    
     def __init__(self, first, second):
         self.list=[first, second]
         
     def __div__(self,other):
         self.list.append(other)
         return self
+    
+    def __add__(self, other):
+        return self.__div__(other)
         
     def __str__(self):
-        return str(self.list)
+        return self.serialize()
     
     def __repr__(self):
+        return self.__class__.__name__+"|"+str(self.list)
         return self.__str__()
+
+    def size(self):
+        return len(self.serialize())
+    
+class CompoundLayerDiv(CompoundLayer):
     
     def serialize(self):
-        data = ''
+        print "COMPOUND_serializeDIV"
+        ret = ''
+        print repr(self.list)
         for layer in reversed(self.list):
-            data+=layer.serialize()
+            print layer.__class__.__name__
+            data = layer.serialize()
+            length=len(data)
+            print "*  serializing %s size=%s"%(repr(layer.__class__.__name__),length)
             
-        return data
-        
+            ret = data + ret
+            hexdump_squashed(data)
+            
+            # update layer properties
+            layer.length = length           # update current layers length
+            
+        hexdump_squashed(ret)
+        return ret
+    
+class CompoundLayerAdd(CompoundLayer):
+    
+    def serialize(self):
+        print "COMPOUND_serializeADD"
+        ret = ''
+        print repr(self.list)
+        for layer in self.list:
+            print ">>"+layer.__class__.__name__
+            data = layer.serialize()
+            length=len(data)
+            print "*  serializing %s size=%s"%(repr(layer.__class__.__name__),length)
+            
+            ret +=  data
+            
+        hexdump_squashed(ret)
+        return ret       
+    

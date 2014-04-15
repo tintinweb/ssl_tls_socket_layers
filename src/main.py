@@ -26,8 +26,17 @@ def main(opts):
     port = opts['port']
     print ip,port
 
-    tcp = TCP(ip=ip, port=443, buffer=16*1024)
-    
+    tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)
+
+
+            
+
+    ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList()+
+                                        TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20))
+    p = TLSRecord(version=0x0301, content_type=0x16)/TLSHandshake(version=0x0302, extensions=ext)
+    resp = tcp/Raw(data=p.serialize())
+    print resp
+    exit()
     print "[ -> ] sending TLS Handshake"
     resp = tcp/Raw(data=serialize(TLSRecord(version=0x0302, content_type=0x16)/TLSHandshake(version=0x0302)))
     print "[ <- ] response: %s"%(len(resp) if resp else 0)
@@ -47,6 +56,6 @@ def main(opts):
 
 if __name__=="__main__":
     opts = {'ip':'172.16.0.55',
-            'port':80}
+            'port':443}
     main(opts)
     exit()

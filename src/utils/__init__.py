@@ -3,6 +3,7 @@ def h2bin(x):
 
 def hexdump_squashed(s):
     allnulls = 0
+    s = str(s)
     for b in xrange(0, len(s), 16):
         lin = [c for c in s[b : b + 16]]
         hxdat = ' '.join('%02X' % ord(c) for c in lin)
