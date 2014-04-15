@@ -23,11 +23,20 @@ class Field(object):
         self.value = value
         
     def get(self):
+        ret=''
         value = self.value or self.default
         print isinstance(value, Layer)
         if hasattr(value,"__call__"):   # is function?
-            value = value()
-        return value
+            ret = value()
+        elif isinstance(value, list):   # list? serialize and join
+            for e in value:
+                ret+=self.get(e)        # deref/serialize list items
+        elif isinstance(value, Layer):  # serialize this layer
+            ret = value.serialize()
+        else:
+            ret = value
+                
+        return ret
     
     def serialize(self):
         value = self.get()
@@ -44,7 +53,7 @@ class Field(object):
         return size
         
     def __repr__(self):
-        return "[F]   %-20s : %-5s %10s"%(self.name,self.struct, repr(self.get()))
+        return "[F]   %-20s : %-5s %-10s"%(self.name,self.struct,self.get())
     
     def __len__(self):
         return len(self.serialize())
@@ -112,3 +121,26 @@ class Layer(object):
     
     def total_len(self):
         return len(self)+self.next_len()
+    
+    
+class CompoundLayer(object):
+    def __init__(self, first, second):
+        self.list=[first, second]
+        
+    def __div__(self,other):
+        self.list.append(other)
+        return self
+        
+    def __str__(self):
+        return str(self.list)
+    
+    def __repr__(self):
+        return self.__str__()
+    
+    def serialize(self):
+        data = ''
+        for layer in reversed(self.list):
+            data+=layer.serialize()
+            
+        return data
+        

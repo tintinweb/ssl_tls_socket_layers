@@ -4,9 +4,12 @@
 '''
 from utils import *
 from layer import *
+import time, os
 
 
-class TLSRecord(Layer):    
+class TLSRecord(Layer):   
+    TYPE_HANDSHAKE = 22 
+    
     def _definition(self):
         # fields and their wire-definition
         # in order!
@@ -15,13 +18,23 @@ class TLSRecord(Layer):
         self.add_field(name='length', struct='!H', default=self.next_len)
         
 class TLSHandshake(Layer):
-    TLSRECORD_CONTENT_TYPE = 0x22
-    TYPE_CLIENT_HANDSHAKE = 0x01
-    TYPE_SERVER_HANDSHAKE = 0x02
+    TYPE_HELLO_REQUEST = 0x00
+    TYPE_CLIENT_HELLO = 0x01
+    TYPE_SERVER_HELLO =0x02
+    TYPE_CERTIfICATE =0x0b
+    TYPE_SERVER_KEY_EXCHANGE = 0x0c
+    TYPE_CERTIFICATE_REQUEST = 0x0d
+    TYPE_SERVER_HELLO_DONE = 0x0e
+    TYPE_CERTIFICATE_VERIFY = 0x0f
+    TYPE_CLIENT_KEY_EXCHANGE = 0x10
+    TYPE_FINISHED = 20
+    TYPE_CERTIFICATE_URL = 21
+    TYPE_CERTIFICATE_STATS = 22
+    TYPE_UNKNOWN_255 = 0xff
      
     def _definition(self):
         
-        self.add_field(name='type', struct='!B', default=self.TYPE_CLIENT_HANDSHAKE)          #client hello
+        self.add_field(name='type', struct='!B', default=self.TYPE_CLIENT_HELLO)          #client hello
         self.add_field(name='dummy_len_remove_me_fixme', struct='!B', default=0x00)
         self.add_field(name='length', struct='!H', default=142-4)
         self.add_field(name='version', struct='!H', default=0x0302)
@@ -38,8 +51,8 @@ class TLSHandshake(Layer):
 
 class TLSPropRandom(Layer):
     def _definition(self):
-        self.add_field(name="gmt_unix_time",  default=h2bin('53 43 5b 90')) #struct="!BBBB",
-        self.add_field(name="random_bytes", default="A"*28)
+        self.add_field(name="gmt_unix_time", struct='!I', default=int(time.time()))
+        self.add_field(name="random_bytes", default=os.urandom(28))
         
 class TLSPropCipherSuites(Layer):
     TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA  = 0xc014
@@ -102,7 +115,74 @@ class TLSExtensionList(Layer):
     def get_extensions_length(self):
         print "len extensions",len(self.get_extensions())
         return len(self.get_extensions())
-          
+
+class TLSExtension(Layer):
+    TLS_EXTENSION_TYPE_SERVER_NAME = 0x0000
+    
+    def _definition(self):
+        # fields and their wire-definition
+        # in order!
+        self.add_field(name='type', struct='!H', default=self.TLS_EXTENSION_TYPE_SERVER_NAME)
+        self.add_field(name='length', struct='!H', default=self.next_len)
+        
+
+    
+       
+class TLSServerNameList(Layer):
+    '''
+    chain with ( TLSExtension/TLSServerNameList )
+    
+          struct {
+              NameType name_type;
+              select (name_type) {
+                  case host_name: HostName;
+              } name;
+          } ServerName;
+    
+          enum {
+              host_name(0), (255)
+          } NameType;
+    
+          opaque HostName<1..2^16-1>;
+    
+          struct {
+              ServerName server_name_list<1..2^16-1>
+          } ServerNameList;
+    '''
+    def _definition(self):
+        # fields and their wire-definition
+        # in order!
+        self.add_field(name='length', struct='!H', default=self.get_name_list_len)
+        self.add_field(name='name_list', default=self.get_name_list)
+        
+    def get_name_list(self):
+        return "".join(
+                       [ 
+                        TLSServerName(type=TLSServerName.TYPE_HOST, data="s.yimg.com").serialize(),
+                        ]
+                       )
+
+        
+    def get_name_list_len(self):
+        return len(self.get_name_list())
+
+    
+class TLSServerName(Layer):
+    '''
+    part of TLSServerNameList
+    '''
+    TYPE_HOST = 0x00
+    def _definition(self):
+        # fields and their wire-definition
+        # in order!
+        self.add_field(name='type', struct='!B', default=self.TYPE_HOST)
+        self.add_field(name='length', struct='!H', default=self.get_name_len)
+        self.add_field(name='data', default='')
+        
+    def get_name_len(self):
+        return len(self.fields['data'])
+ 
+
 class TLSHeartBeat(Layer):    
     def _definition(self):
         # fields and their wire-definition
@@ -149,6 +229,12 @@ def serialize(layer):
     
 if __name__=="__main__":
     
+    
+    p = (TLSExtension()/TLSServerNameList()).serialize()
+    print repr(p)
+    hexdump_squashed((p))
+    
+    exit()
     x=TLSRecord()
     x.unserialize("\x01\x00\x02\x04\x05")   
     print repr(x)
