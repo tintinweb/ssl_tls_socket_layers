@@ -33,7 +33,7 @@ def main(opts):
 
     ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList()+
                                         TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20))
-    p = TLSRecord(version=0x0301, content_type=0x16)/TLSHandshake(version=0x0302, extensions=ext)
+    p = TLSRecord(version=0x0301)/TLSHandshake(version=0x0302, extensions=ext)
     resp = tcp/Raw(data=p.serialize())
     print resp
     exit()

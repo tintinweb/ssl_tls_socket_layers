@@ -13,7 +13,7 @@ class TLSRecord(Layer):
     def _definition(self):
         # fields and their wire-definition
         # in order!
-        self.add_field(name='content_type', struct='!B', default=0x18)
+        self.add_field(name='content_type', struct='!B', default=self.next_magic)
         self.add_field(name='version', struct='!H', default=0x0302)
         self.add_field(name='length', struct='!H', default=self.next_size)
         
@@ -32,6 +32,8 @@ class TLSHandshake(Layer):
     TYPE_CERTIFICATE_STATS = 22
     TYPE_UNKNOWN_255 = 0xff
      
+     
+    MAGIC = TLSRecord.TYPE_HANDSHAKE
     def _definition(self):
         
         self.add_field(name='type', struct='!B', default=self.TYPE_CLIENT_HELLO)          #client hello
