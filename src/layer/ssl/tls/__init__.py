@@ -7,8 +7,13 @@ from layer import *
 import time, os
 
 
-class TLSRecord(Layer):   
-    TYPE_HANDSHAKE = 22 
+class TLSRecord(Layer):
+    CONTENT_TYPE_CHANGE_CIPHER_SPEC = 20
+    CONTENT_TYPE_ALERT = 21
+    CONTENT_TYPE_HANDSHAKE = 22
+    CONTENT_TYPE_APPLICATION_DATA = 23
+    CONTENT_TYPE_HEARTBEAT = 24
+    CONTENT_TYPE_UNKNOWN_255 = 255
     
     PROTOCOL_TLS_1_0 = 0x0301
     PROTOCOL_TLS_1_1 = 0x0302
@@ -25,7 +30,7 @@ class TLSHandshake(Layer):
     TYPE_HELLO_REQUEST = 0x00
     TYPE_CLIENT_HELLO = 0x01
     TYPE_SERVER_HELLO =0x02
-    TYPE_CERTIfICATE =0x0b
+    TYPE_CERTIFICATE =0x0b
     TYPE_SERVER_KEY_EXCHANGE = 0x0c
     TYPE_CERTIFICATE_REQUEST = 0x0d
     TYPE_SERVER_HELLO_DONE = 0x0e
@@ -37,27 +42,56 @@ class TLSHandshake(Layer):
     TYPE_UNKNOWN_255 = 0xff
      
      
-    MAGIC = TLSRecord.TYPE_HANDSHAKE
+    MAGIC = TLSRecord.CONTENT_TYPE_HANDSHAKE
     def _definition(self):
         
-        self.add_field(name='type', struct='!B', default=self.TYPE_CLIENT_HELLO)          #client hello
-        self.add_field(name='length_hi', struct='!B', default=0x00)  #fix!
-        self.add_field(name='length', struct='!H', default=self.get_handshake_size) #142-4
+        self.add_field(name='type', struct='!B', default=self.next_magic)          #client hello
+        #self.add_field(name='length_hi', struct='!B', default=0x00)  #fix!
+        self.add_field(name='length', struct='!I{3}', default=self.get_handshake_length) #+2
+        
+        self.add_field(name='data', default=TLSClientHello())
+        
+    def next_magic(self):
+        return self.fields['data'].value.MAGIC
+
+    def get_handshake_length(self):
+        print "data",len(self.fields['data']),"<---"
+        return len(self.fields['data'])
+        #
+        #self.add_field(name='data', default=TLSClientHello())
+        '''
         self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
         #
-        self.add_field(name='random', default=TLSPropRandom().serialize)
+
+        self.add_field(name='random', default=TLSPropRandom())
         #
         self.add_field(name='session_id', struct='!B', default=0)
         #
-        self.add_field(name='cipher_suites', default=TLSPropCipherSuites().serialize)
+        self.add_field(name='cipher_suites', default=TLSPropCipherSuites())
         #
-        self.add_field(name='compression_methods', default=TLSPropCompressionMethod().serialize)
+        self.add_field(name='compression_methods', default=TLSPropCompressionMethod())
         #
-        self.add_field(name='extensions', default=TLSExtensionList().serialize)
-        
+        self.add_field(name='extensions', default=TLSExtensionList())
+        '''
     def get_handshake_size(self):
         skip =('type','length_hi','length')
         return sum( len(value) for f_name,value in self.fields.iteritems() if f_name not in skip )
+
+class TLSClientHello(Layer):
+     
+    MAGIC = TLSHandshake.TYPE_CLIENT_HELLO
+    def _definition(self):
+        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
+        #
+        self.add_field(name='random', default=TLSPropRandom())
+        #
+        self.add_field(name='session_id', struct='!B', default=0)
+        #
+        self.add_field(name='cipher_suites', default=TLSPropCipherSuites())
+        #
+        self.add_field(name='compression_methods', default=TLSPropCompressionMethod())
+        #
+        self.add_field(name='extensions', default=TLSExtensionList())
 
 
 class TLSPropRandom(Layer):
@@ -120,6 +154,7 @@ class TLSExtensionList(Layer):
                 
                 h2bin("00 23 00 00 "),              #session ticket
                 h2bin("00 0f 00 01 01"),            # heartbeat
+                
                 ]
         return "".join(exts)
     
@@ -128,8 +163,9 @@ class TLSExtensionList(Layer):
         return len(self.fields['extensions'])
 
 class TLSExtension(Layer):
-    TLS_EXTENSION_TYPE_SERVER_NAME = 0x0000
-    TLS_EXTENSION_TYPE_SESSION_TICKET_TLS =0x0023
+    TYPE_SERVER_NAME = 0x0000
+    TYPE_SESSION_TICKET_TLS =0x0023
+    TYPE_HEARTBEAT = 0x000f
     
     def _definition(self):
         # fields and their wire-definition
@@ -139,7 +175,7 @@ class TLSExtension(Layer):
     
 class TLSSessionTicket(Layer):
     
-    MAGIC = TLSExtension.TLS_EXTENSION_TYPE_SESSION_TICKET_TLS
+    MAGIC = TLSExtension.TYPE_SESSION_TICKET_TLS
     def _definition(self):
         #type + length from TLSExtension
         self.add_field(name='data', default='')          
@@ -165,7 +201,7 @@ class TLSServerNameList(Layer):
               ServerName server_name_list<1..2^16-1>
           } ServerNameList;
     '''
-    MAGIC = TLSExtension.TLS_EXTENSION_TYPE_SERVER_NAME    # previous.next.magic()
+    MAGIC = TLSExtension.TYPE_SERVER_NAME    # previous.next.magic()
     
     def _definition(self):
         # fields and their wire-definition
@@ -198,7 +234,15 @@ class TLSServerName(Layer):
         return len(self.fields['data'])
  
 
-class TLSHeartBeat(Layer):    
+class TLSHeartBeat(Layer): 
+    MAGIC = TLSRecord.CONTENT_TYPE_HEARTBEAT
+      
+    class Handshake(Layer):
+        
+        MAGIC = TLSExtension.TYPE_HEARTBEAT
+        def _definition(self):
+            self.add_field(name='mode', struct="!B", default=0x01)       
+         
     def _definition(self):
         # fields and their wire-definition
         # in order!
@@ -214,71 +258,57 @@ class TLSHeartBeat(Layer):
         return 'P' * (0 if self.payload_length() >= 16 else 16)
 
 
-
-
-
-def DEP_serialize(layer):
-    # layer = leaf layer .. we need to serialize this bottom up
-    # last layer
-    data = ''
-    while (layer):
-        layer_data = layer.serialize()  # bottom layer serialized data
-        layer_len = len(layer_data)     # bottom layer serialized len
-        print "*  serializing %s size=%s"%(repr(layer.__class__.__name__),layer_len)
-        data = layer_data + data        # <previ.data> <next.data>
-        layer.curr_layer_len = layer_len
-        hexdump_squashed(layer_data)
-        layer=layer.prev                # switch to previous layer
-        # update size?
-        if not layer:
-            #no need to do this if this was root
-            break
-        layer.next_layer_len= layer_len       # update sizeof (next layer)
-        print "set",layer_len
-        # update data
-
-    return data
+class TLSAlert(Layer):  
+    LEVEL_WARNING = 0x01
+    LEVEL_FATAL = 0x02
+    LEVEL_UNKNOWN_255 = 0xff
+    
+    DESCRIPTION_CLOSE_NOTIFY = 0
+    DESCRIPTION_UNEXPECTE_MESSAGE = 10
+    DESCRIPTION_BAD_RECORD_MAC = 20
+    DESCRIPTION_DESCRIPTION_FAILED_RESERVED = 21
+    DESCRIPTION_RECORD_OVERFLOW = 22
+    DESCRIPTION_DECOMPRESSION_FAILUR = 30
+    DESCRIPTION_HANDSHAKE_FAILUR = 40
+    DESCRIPTION_NO_CERTIFICATE_RESERVED = 41
+    DESCRIPTION_BAD_CERTIFICATE = 43
+    DESCRIPTION_UNSUPPORTED_CERTIFICATE = 43
+    DESCRIPTION_CERTIFICATE_REVOKED = 44
+    DESCRIPTION_CERTIFICATE_EXPIRED = 45
+    DESCRIPTION_CERTIFICATE_UNKNOWN = 46
+    DESCRIPTION_ILLEGAL_PARAMETER = 47
+    DESCRIPTION_UNKNOWN_CA = 48
+    DESCRIPTION_ACCESS_DENIED = 49
+    DESCRIPTION_DECODE_ERROR = 50
+    DESCRIPTION_DECRYPT_ERROR = 51
+    DESCRIPTION_EXPORT_RESTRICTION_RESERVED = 60
+    DESCRIPTION_PROTOCOL_VERSION = 70
+    DESCRIPTION_INSUFFICIENT_SECURITY = 71
+    DESCRIPTION_INTERNAL_ERROR = 80
+    DESCRIPTION_USER_CANCELED = 90
+    DESCRIPTION_NO_RENEGOTIATION = 100
+    DESCRIPTION_UNSUPPORTED_EXTENSION = 110
+    DESCRIPTION_UNKNOWN_255 = 255
     
     
+    MAGIC = TLSRecord.CONTENT_TYPE_ALERT
+    
+    def _definition(self):
+        # fields and their wire-definition
+        # in order!
+        self.add_field(name='level', struct='!B', default=self.length)
+        self.add_field(name='description', struct='!B', default=self.DESCRIPTION_CLOSE_NOTIFY)
     
     
 if __name__=="__main__":
     #hexdump_squashed(TLSExtension()/TLSServerNameList())
+    print "------tin"
+    
+    hexdump_squashed(TLSHandshake()/TLSClientHello())
+    exit()
 
     ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList())
     p = TLSRecord()/TLSHandshake(extensions=ext)
     print "--"
     hexdump_squashed(p)
     exit()
-    print "---"
-    p = TLSExtensionList(extensions=extensions)
-    p = p.serialize()
-    print repr(p)
-    hexdump_squashed((p))
-    
-    exit()
-    x=TLSRecord()
-    x.unserialize("\x01\x00\x02\x04\x05")   
-    print repr(x)
-    exit()
-
-    serialize(TLSHandshake())
-    exit()
-
-    x = TLSRecord(version=0xffff)
-    y = TLSRecord(version=1)
-    z = TLSRecord(version=2)
-    h = TLSHeartBeat(payload="a", padding='X')
-    
-    a = x/y/z/h
-    print "next",repr(a.next)
-    print "prev",repr(a.prev)
-
-    hexdump_squashed( serialize(a) )
-    exit()
-
-    hexdump_squashed(h.serialize())
-    #hexdump_squashed(str(x))
-    exit()
-    print x/y
-    print x.prev,"--",x.next

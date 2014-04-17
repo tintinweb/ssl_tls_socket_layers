@@ -26,17 +26,29 @@ def main(opts):
     port = opts['port']
     print ip,port
 
-    tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)
+    tcp = TCP(ip="google.at", port=443, buffer=16*1024)
 
 
             
-
+    
     ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList()+
-                                        TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20))
-    p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(version=TLSRecord.PROTOCOL_TLS_1_1, extensions=ext)
+                                        TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20)+
+                                        TLSExtension()/TLSHeartBeat.Handshake())
+    
+    #p =  TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake()/TLSClientHello()
+
+    p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(data=TLSClientHello(version=TLSRecord.PROTOCOL_TLS_1_1,extensions=ext))
     resp = tcp/Raw(data=p.serialize())
     print resp
     exit()
+    
+    
+    
+    
+    
+    
+    
+    
     print "[ -> ] sending TLS Handshake"
     resp = tcp/Raw(data=serialize(TLSRecord(version=0x0302, content_type=0x16)/TLSHandshake(version=0x0302)))
     print "[ <- ] response: %s"%(len(resp) if resp else 0)

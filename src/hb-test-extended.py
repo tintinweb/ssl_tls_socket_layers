@@ -173,8 +173,8 @@ def main():
     sys.stdout.flush()
     
     import layer.ssl.tls as x
-    hello = x.TLSRecord(version=0x0301, content_type=0x16)/x.TLSHandshake(version=0x0302)
-    hello=x.serialize(hello)
+    hello = x.TLSRecord(version=0x0301)/x.TLSHandshake(version=0x0302, data=x.TLSClientHello())
+    hello=hello.serialize()
     hexdump_squashed(hello)
     
     s.send(hello)
@@ -193,7 +193,7 @@ def main():
     sys.stdout.flush()
 
     hb = x.TLSRecord(version=0x0302)/x.TLSHeartBeat( payload_length=0x4000)
-    hb = x.serialize(hb)
+    hb = hb.serialize()
     hexdump_squashed(hb)
     opts.debug=True
     s.send(hb)

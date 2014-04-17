@@ -4,6 +4,45 @@
 '''
 from collections import OrderedDict
 import struct
+import re
+
+class Packer:
+    REX_DEF_SLICE = re.compile("(?P<type>.*?)\{(?P<start>-?\d)(?P<end>\,-?\d?)?\}?")
+    @staticmethod
+    def pack(definition, value):
+        '''
+        definition: + based on struct help
+                    + extended with slicing functionality
+        
+        extended example:   I{3}    ... 3 byte unsigned int
+                            I{3,4}  ... 1 byte unsigned int value[3,4] once packed
+        '''
+        if "}" in definition:
+            # extended syntax
+            # TODO: right now we only support one struct definition 
+            definition,start,end = Packer.REX_DEF_SLICE.match(definition).groups()
+            start = int(start)
+            if end:
+                end = end.strip(",")
+                if not len(end):
+                    end = None
+                else:
+                    end = int(end)
+            # pack
+            data = struct.pack(definition,value)
+            if "<" in definition:
+                raise "cannot handle little-endianess atm!"
+            if end:
+                raise "We do not handle this case atm!"
+                data = data[start:end]      #I{1,2} .. char 1-2
+            else:
+                data = data[len(data)-start:]         #I{1}   .. up to 1 char .. 0x00 00 00 aa
+            # only first struct def handled
+        else:
+            data = struct.pack(definition,value)
+            
+        
+        return data
 
 class FieldDict(OrderedDict):
     'Store items in the order the keys were last added'
@@ -23,24 +62,26 @@ class Field(object):
         self.value = value
         
     def get(self, value=None):
-        print "[F] ->"+self.name
+        #print "[F] ->"+self.name
         ret=''
         value = value if value!=None else (self.value or self.default)
         if isinstance(value, Layer) or isinstance(value,CompoundLayer):  # serialize this layer
-            print "[F] isinstance"
+            #print "[F] isinstance"
             ret = value.serialize()
         elif hasattr(value,"__call__"):   # is function?
-            print "[F] val"
+            #print "[F] val"
             ret = self.get(value())
         elif isinstance(value, list):   # list? serialize and join
-            print "[F] list"
+            #print "[F] list"
             for e in value:
                 ret+=self.get(e)        # deref/serialize list items
         else:
-            print "[F] raw"
+            #print "[F] raw"
             ret = value
                 
         return ret
+    
+
     
     def serialize(self):
         value = self.get()
@@ -48,6 +89,7 @@ class Field(object):
         print repr(self)
         
         if self.struct:
+            return Packer.pack(self.struct, value)
             return struct.pack(self.struct, value) 
         return value 
     
@@ -72,9 +114,11 @@ class Layer(object):
             self.length=0
         def size(self):
             print "DUMMY"
+            #raise
             return self.length
         def magic(self):
             print "DUMMY_TYPE"
+            raise
             return 0xcc
         def next_size(self):
             raise
@@ -107,8 +151,8 @@ class Layer(object):
         other.prev = self
         print "%s/%s"%(repr(self),repr(other))
         print "--div--"
-        print str(self)
-        print str(self.next)
+        print "self => ",repr(self)
+        print "next => ",repr(self.next)
         return CompoundLayerDiv(self,other)
 
     def __add__(self, other):
@@ -128,21 +172,22 @@ class Layer(object):
         return self.MAGIC
     
     def next_magic(self):
+        print "next_size:",self.next.__class__.__name__,repr(self.next.magic)
         return self.next.magic()
     
     def next_size(self):
-        print "next_size:",self.next.__class__.__name__
+        print "next_size:",self.next.__class__.__name__,self.next.size()
         return self.next.size()
 
     def serialize(self):
         # todo add caching,call functions after all other fields were set or prioritize
         if False and self.data_serialized:
             return self.data_serialized
-        print "[L]"+self.__class__.__name__
+        #print "[L]"+self.__class__.__name__
         #self.data_serialized = "".join([field.serialize() for field in self.fields.values()]) 
         self.data_serialized = ''
         for field in self.fields.values():
-            print "[L]"+ field.name
+            #print "[L]"+ field.name
             self.data_serialized += field.serialize()
         return self.data_serialized
     
@@ -184,7 +229,10 @@ class CompoundLayer(object):
         self.list=[first, second]
         
     def __div__(self,other):
+        self.list[-1].next = other
+        other.prev = self.list[-1]
         self.list.append(other)
+        
         return self
     
     def __add__(self, other):
