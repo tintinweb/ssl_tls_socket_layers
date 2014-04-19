@@ -141,6 +141,7 @@ class Layer(object):
                 self.fields[k].set(v)
             except KeyError, ke:
                 print "invalid argument (%s): %s=%s  (%s)"%(self.__class__.__name__,k,v,repr(self.fields.keys()))
+                raise
                 
         if '__raw' in kwargs.keys():
             # load from __raw.. skip all other fields

@@ -66,7 +66,7 @@ class TCP(BaseSocket):
         
 class UDP(BaseSocket):
     def _connect(self):
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(self.timeout)
         self.sock.connect((self.ip,self.port))
         
