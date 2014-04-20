@@ -61,10 +61,13 @@ class Field(object):
     def set(self, value):
         self.value = value
         
+    def getValue(self, value=None):
+        return value if value!=None else (self.value or self.default)
+        
     def get(self, value=None):
         #print "[F] ->"+self.name
         ret=''
-        value = value if value!=None else (self.value or self.default)
+        value = self.getValue(value=value)
         if isinstance(value, Layer) or isinstance(value,CompoundLayer):  # serialize this layer
             #print "[F] isinstance"
             ret = value.serialize()
@@ -90,7 +93,7 @@ class Field(object):
         
         if self.struct:
             return Packer.pack(self.struct, value)
-            return struct.pack(self.struct, value) 
+            #return struct.pack(self.struct, value) 
         return value 
     
     def unserialize(self, data):
@@ -118,12 +121,13 @@ class Layer(object):
             return self.length
         def magic(self):
             print "DUMMY_TYPE"
-            raise
-            return 0xcc
+            return 0x00
         def next_size(self):
             raise
         def next_magic(self):
             raise
+        
+    MAGIC = 0x00
         
     def __init__(self, **kwargs):
         self.next = Layer.NoneLayer()           # previous -- linked by / operator

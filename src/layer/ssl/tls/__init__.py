@@ -52,7 +52,7 @@ class TLSHandshake(Layer):
         self.add_field(name='data', default=TLSClientHello())
         
     def next_magic(self):
-        return self.fields['data'].value.MAGIC
+        return self.fields['data'].getValue().MAGIC
 
     def get_handshake_length(self):
         print "data",len(self.fields['data']),"<---"
@@ -101,6 +101,15 @@ class TLSPropRandom(Layer):
         
 class TLSPropCipherSuites(Layer):
     
+    TLS_NULL_WITH_NULL_NULL = 0x0000
+    
+    TLS_RSA_WITH_NULL_MD5 = 0x0001
+    
+    TLS_RSA_WITH_NULL_SHA1 = 0x0002
+    TLS_RSA_WITH_NULL_SHA256 = 0x003b
+    
+    TLS_RSA_WITH_3DES_EDE_CBC_SHA =  0x000a
+    
     TLS_DHE_RSA_WITH_3DES_EDE_CBC_SHA  = 0x0016    
     TLS_DHE_DSS_WITH_3DES_EDE_CBC_SHA  = 0x0013
     TLS_RSA_WITH_3DES_EDE_CBC_SHA =  0x000a
@@ -129,7 +138,7 @@ class TLSPropCipherSuites(Layer):
     TLS_RSA_WITH_AES_256_CBC_SHA = 0x0035
     TLS_DHE_DSS_WITH_AES_256_CBC_SHA = 0x0038    
     TLS_DHE_RSA_WITH_AES_256_CBC_SHA = 0x0039
-    '''
+    
     TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA = 0xc00a
     TLS_ECDH_RSA_WITH_AES_256_CBC_SHA = 0xc00f    
     TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA  = 0xc014
@@ -145,7 +154,7 @@ class TLSPropCipherSuites(Layer):
     TLS_ECDH_ECDSA_WITH_AES_256_CBC_SHA =0xc005
 
     TLS_RSA_WITH_CAMELLIA_256_CBC_SHA = 0x0084
-    '''
+    
     
     def _definition(self):
         self.add_field(name="length", struct='!H', default=self.cipher_list_length)
@@ -160,6 +169,7 @@ class TLSPropCipherSuites(Layer):
     
 class TLSPropCompressionMethod(Layer):
     TLS_COMPRESS_NULL = 0x00
+    TLS_COMPRESS_DEFLATE = 0x01
     
     def _definition(self):
         self.add_field(name="length", struct='!B', default=self.compress_list_length)
@@ -200,6 +210,9 @@ class TLSExtension(Layer):
     TYPE_SERVER_NAME = 0x0000
     TYPE_SESSION_TICKET_TLS =0x0023
     TYPE_HEARTBEAT = 0x000f
+    TYPE_STATUS_REQUEST = 0x0005
+    TYPE_RENEGOTIATION_INFO = 0xff01
+    TYPE_SIGNATURE_ALGORITHMS = 0x000d
     
     def _definition(self):
         # fields and their wire-definition
@@ -338,7 +351,7 @@ if __name__=="__main__":
     #hexdump_squashed(TLSExtension()/TLSServerNameList())
     print "------tin"
     
-    hexdump_squashed(TLSHandshake()/TLSClientHello())
+    hexdump_squashed(TLSHandshake(data=TLSClientHello()))
     exit()
 
     ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList())
