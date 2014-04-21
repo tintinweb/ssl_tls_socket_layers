@@ -177,7 +177,7 @@ class Layer(object):
         return self.MAGIC
     
     def next_magic(self):
-        print "next_size:",self.next.__class__.__name__,repr(self.next.magic)
+        print "next_size:",self.next.__class__.__name__,repr(self.next.magic())
         return self.next.magic()
     
     def next_size(self):
@@ -223,7 +223,7 @@ class Layer(object):
 
     
 from utils import *    
-class CompoundLayer(object):
+class CompoundLayer(Layer.NoneLayer):       # fix remove?
     '''
     
     track and handle /concatenations and provide interface for easy serialization
@@ -234,6 +234,7 @@ class CompoundLayer(object):
         self.list=[first, second]
         
     def __div__(self,other):
+        self.next = other
         self.list[-1].next = other
         other.prev = self.list[-1]
         self.list.append(other)

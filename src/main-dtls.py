@@ -30,6 +30,7 @@ def main(opts):
     udp = UDP(ip="172.16.0.55", port=443, buffer=16*1024, timeout=0.5)
     DTLSRecord.CONTENT_TYPE_ALERT
     #p =  TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake()/TLSClientHello()4
+    '''
     p = Raw(data="\x11\xfe\xff\x00\x00\x00\x00\x00\x00\x00\x00")
     p_serialized = p.serialize()
     print "sending: %d"%len(p_serialized)
@@ -37,11 +38,18 @@ def main(opts):
     print "response: %d"%len(resp) if resp else 0 
     if resp:
         hexdump_squashed(resp)
-    exit()
+    #exit()
+    '''
 
-    
-    p = DTLSRecord()/DTLSHandshake( data=DTLSClientHello())
-    p_serialized = p.serialize()
+    import random
+
+    fixlen = 0
+    p = DTLSRecord(sequence=1,length=208)/DTLSHandshake(sequence=1,length=193, fragment_offset=193-fixlen, fragment_length=fixlen, data=DTLSClientHello())
+    #p = DTLSRecord(sequence=1)/DTLSHandshake(sequence=1, fragment_offset=fixlen, data=DTLSClientHello(random=layer.ssl.tls.TLSPropRandom(random_bytes='a'*790)))
+
+
+
+    p_serialized = p.serialize()        
     print "sending: %d"%len(p_serialized)
     resp = udp/Raw(data=p_serialized)
     print "response: %d"%len(resp) if resp else 0 
@@ -49,8 +57,9 @@ def main(opts):
         hexdump_squashed(resp)
 
 
+    exit()
 
-    '''
+    
     fixlen=00
     #p = DTLSRecord(length=140+fixlen)/DTLSHandshake(length=128+fixlen,fragment_offset=fixlen,fragment_length=128, data=DTLSClientHello(cookie=DTLSPropCookie(cookie=resp[-16:])))
     p = DTLSRecord(sequence=1)/DTLSHandshake( sequence=1, fragment_offset=fixlen, data=DTLSClientHello(cookie=DTLSPropCookie(cookie=resp[-20:])))
@@ -59,7 +68,7 @@ def main(opts):
     if (resp):
         hexdump_squashed(resp)
         
-    '''
+    raw_input()
         
         
     '''
