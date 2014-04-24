@@ -110,13 +110,13 @@ class TLSServerHello(Layer):
         #
         self.add_field(name='extensions', default=TLSExtensionList())
         
-class TLSCertificates(Layer):
+class TLSCertificate(Layer):
      
     MAGIC = TLSHandshake.TYPE_CERTIFICATE
     def _definition(self):
         self.add_field(name='length', struct='!I{3}', default=self.get_certificates_length)
         #
-        self.add_field(name='certificates', default=TLSPropCertificate()+TLSPropCertificate())
+        self.add_field(name='certificates', default=TLSPropCertificate())
         
     def get_certificates_length(self):
         return len(self.fields['certificates'])

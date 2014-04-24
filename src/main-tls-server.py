@@ -26,10 +26,10 @@ def main(opts):
                                         TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20)+
                                         TLSExtension()/TLSHeartBeat.Handshake())
     
-    # build server hello
+    # build server handshake
     version=TLSRecord.PROTOCOL_TLS_1_0
     server_hello = TLSRecord(version=version)/TLSHandshake(data=TLSServerHello(version=version,extensions=ext))
-    certificate = TLSRecord(version=version)/TLSHandshake(data=TLSCertificates(certificates=TLSPropCertificate()+TLSPropCertificate()))
+    certificate = TLSRecord(version=version)/TLSHandshake(data=TLSCertificate(certificates=TLSPropCertificate()+TLSPropCertificate()))
     ske = TLSRecord(version=version)/TLSHandshake(data=TLSServerKeyExchange())
     hello_done = TLSRecord(version=version)/TLSHandshake(data=TLSServerHelloDone(data='arg'))
     

