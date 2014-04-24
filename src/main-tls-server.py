@@ -39,6 +39,7 @@ def main(opts):
     
     print "<----",repr(TLSRecord(__raw=resp))
     resp = tcp/(server_hello+certificate+ske+hello_done)    
+    resp= tcp.recv(1024)  # wait for client
     print "<---",repr(TLSRecord(__raw=resp))
     exit()
     
