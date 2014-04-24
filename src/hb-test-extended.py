@@ -173,11 +173,13 @@ def main():
     sys.stdout.flush()
     
     import layer.ssl.tls as x
-    hello = x.TLSRecord(version=0x0301)/x.TLSHandshake(version=0x0302, data=x.TLSClientHello())
+    hello = x.TLSRecord(version=0x0309,length=5+40)/x.TLSHandshake(length=41, data=x.TLSClientHello(version=0x0308))
+    #hello = x.TLSRecord(version=0x0301,)/x.TLSHandshake(length=2, data=x.TLSClientHello(version=0x0302))
     hello=hello.serialize()
-    hexdump_squashed(hello)
+    hexdump_squashed(hello[:45+5])
     
-    s.send(hello)
+    s.send(hello[:45+5])
+    exit()
     print '[ *] [TCP] [TLS] Waiting for Server Hello...'
     sys.stdout.flush()
     while True:

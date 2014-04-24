@@ -1,17 +1,8 @@
 '''
-Created on Apr 13, 2014
+Created on Apr 24, 2014
 
 @author: tintinweb
 
-TODO:    
-    * proto description with class only.. no serialize/unserialize
-    * get rid of utils.serialize
-    * move hexdump to layer
-    * allow cross proto manipulations
-        * upper layer accesses lower layer to set own fields
-    * only serialize once
-        * dirty bits? serialize on update or only on read op
-    * match protocol based on layer descriptions
 '''
 from utils import *
 from layer.ssl.tls import *
@@ -24,9 +15,9 @@ import sys
 def main(opts):
     ip = opts['ip']
     port = opts['port']
-    print ip,port
 
-    tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)
+    tcp = TCP(ip="0.0.0.0", port=443, buffer=16*1024, mode='server')
+    print "build packet"
 
 
             
@@ -35,11 +26,20 @@ def main(opts):
                                         TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20)+
                                         TLSExtension()/TLSHeartBeat.Handshake())
     
-    #p =  TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake()/TLSClientHello()
+    # build server hello
+    version=TLSRecord.PROTOCOL_TLS_1_0
+    server_hello = TLSRecord(version=version)/TLSHandshake(data=TLSServerHello(version=version,extensions=ext))
+    certificate = TLSRecord(version=version)/TLSHandshake(data=TLSCertificates(certificates=TLSPropCertificate()+TLSPropCertificate()))
+    ske = TLSRecord(version=version)/TLSHandshake(data=TLSServerKeyExchange())
+    hello_done = TLSRecord(version=version)/TLSHandshake(data=TLSServerHelloDone(data='arg'))
+    
 
-    p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(data=TLSClientHello(version=TLSRecord.PROTOCOL_TLS_1_1,extensions=ext))
-    resp = tcp/Raw(data=p.serialize())
-    print resp
+    resp= tcp.recv(1024)  # wait for client
+
+    
+    print "<----",repr(TLSRecord(__raw=resp))
+    resp = tcp/(server_hello+certificate+ske+hello_done)    
+    print "<---",repr(TLSRecord(__raw=resp))
     exit()
     
     

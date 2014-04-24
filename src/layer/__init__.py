@@ -199,8 +199,9 @@ class Layer(object):
     def unserialize(self, data):
         size = 0
         for name,field in self.fields.iteritems():
-            print name,field,data
+            pos=size
             size +=field.unserialize(data[size:])       # feed next chunk
+            print name,field,repr(data[pos:size])
         return size
     
     def add_field(self, **kwargs):

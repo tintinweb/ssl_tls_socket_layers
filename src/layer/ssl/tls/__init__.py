@@ -15,6 +15,7 @@ class TLSRecord(Layer):
     CONTENT_TYPE_HEARTBEAT = 24
     CONTENT_TYPE_UNKNOWN_255 = 255
     
+    PROTOCOL_SSL_3_0 = 0x0300
     PROTOCOL_TLS_1_0 = 0x0301
     PROTOCOL_TLS_1_1 = 0x0302
     PROTOCOL_TLS_1_2 = 0x0303
@@ -93,7 +94,63 @@ class TLSClientHello(Layer):
         #
         self.add_field(name='extensions', default=TLSExtensionList())
 
+class TLSServerHello(Layer):
+     
+    MAGIC = TLSHandshake.TYPE_SERVER_HELLO
+    def _definition(self):
+        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
+        #
+        self.add_field(name='random', default=TLSPropRandom())
+        #
+        self.add_field(name='session_id', struct='!B', default=0)
+        #
+        self.add_field(name='cipher_suite', struct='!H', default=TLSPropCipherSuites.TLS_NULL_WITH_NULL_NULL)
+        #
+        self.add_field(name='compression_method', struct='!B', default=TLSPropCompressionMethod.TLS_COMPRESS_NULL)
+        #
+        self.add_field(name='extensions', default=TLSExtensionList())
+        
+class TLSCertificates(Layer):
+     
+    MAGIC = TLSHandshake.TYPE_CERTIFICATE
+    def _definition(self):
+        self.add_field(name='length', struct='!I{3}', default=self.get_certificates_length)
+        #
+        self.add_field(name='certificates', default=TLSPropCertificate()+TLSPropCertificate())
+        
+    def get_certificates_length(self):
+        return len(self.fields['certificates'])
 
+class TLSPropCertificate(Layer):
+    def _definition(self):
+        self.add_field(name="length", struct='!I{3}', default=self.get_certificates_length)
+        self.add_field(name="data", default='')
+          
+    def get_certificates_length(self):
+        return len(self.fields['data'])
+        
+class TLSServerKeyExchange(Layer):
+     
+    MAGIC = TLSHandshake.TYPE_SERVER_KEY_EXCHANGE
+    def _definition(self):
+        self.add_field(name='length', struct='!I{3}', default=self.get_ske_length)
+        #
+        self.add_field(name='data', default=os.urandom(329))
+        
+    def get_ske_length(self):
+        return len(self.fields['data'])
+        
+class TLSServerHelloDone(Layer):
+    
+    MAGIC = TLSHandshake.TYPE_SERVER_HELLO_DONE
+    def _definition(self):
+        self.add_field(name='length', struct='!I{3}', default=self.get_data_length)
+        #
+        self.add_field(name='data', default='')
+        
+    def get_data_length(self):
+        return len(self.fields['data'])
+        
 class TLSPropRandom(Layer):
     def _definition(self):
         self.add_field(name="gmt_unix_time", struct='!I', default=int(time.time()))
