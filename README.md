@@ -24,6 +24,7 @@ TODO
 	    * dirty bits? serialize on update or only on read op
 	* [done] match protocol based on layer descriptions
 	* ASN1 mutations
+	* TLSRecord mutations.. fuzz**zz
     
     
 
