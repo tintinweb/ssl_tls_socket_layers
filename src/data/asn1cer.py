@@ -1,6 +1,7 @@
 
-import re,hashlib, binascii
-
+import re
+import binascii, struct
+import hashlib
     
 class ASN1Element(object):
     TYPE_UNIVERSAL = 0x00
@@ -15,6 +16,7 @@ class ASN1Element(object):
         self.hdr_len = None
         self.offset = None  # start offset
         self.value_in_context = None
+        self.has_substructure = False
         
         self.bitstring_unused_bits =None        # BITSTRING SPECIFIC (extra byte)
         if data:
@@ -33,7 +35,7 @@ class ASN1Element(object):
     def get_tag_class(self):
         return self.tag & 0b11000000
     def get_tag_pc(self):
-        return self.tag & 0b00100000        #indicates sub_structure
+        return self.tag & 0b00100000       #indicates sub_structure
     def get_tag_type(self):
         return self.tag & 0b00011111  
     def get_tag_try_anyway(self):
@@ -130,11 +132,54 @@ class ASN1Element(object):
                 rv += ".%d"%b
         return rv
     
+    def serialize(self):
+        rv = ''
+        tag = self.tag
+        value = self.value
+        length = self.length
+        real_length=self.real_length        
+        
+        # [tag]{length..n][value]
+        rv += chr(tag)
+        # length - only support up to 4 bytes right now
+        if length== 0x80:
+            # indefinite length?! encode  real_length as multibyte
+            lenbytes = self._length_to_bytes(real_length)
+            lenbytes = chr((0x80 | len(lenbytes))) + lenbytes     #prepend number of bytes
+        elif length >0x80:
+            # multibyte
+            lenbytes = self._length_to_bytes(length)
+            lenbytes = chr((0x80 | len(lenbytes))) + lenbytes     #prepend number of bytes
+        else:
+            #length <0x80
+            lenbytes = chr(length)
+            
+        rv += lenbytes
+        
+        # value 
+        if self.bitstring_unused_bits!= None:
+            rv += self.bitstring_unused_bits
+            
+        if not self.has_substructure:
+            rv += value
+            
+        return rv
+        
+    def _length_to_bytes( self, intvar, byteorder='little'):
+        rv = ''
+        while intvar!=0x00:
+            rv += chr(intvar & 0xff)
+            intvar = intvar >> 8
+        if byteorder=='little':
+            rv = rv[::-1]
+        return rv
+    
 class ASN1Parse(object):
-    def __init__(self, data):
+    def __init__(self, data=None):
         self.data = data
         self.offset=0
-        self.length=len(self.data)
+        if data:
+            self.length=len(self.data)
         
         self.objstream =[]
         
@@ -167,6 +212,7 @@ class ASN1Parse(object):
                 # Dive into ASN1.value
                 # there's another sub-asn1 struct
                 sub_elems=self._parse(e.value)
+                e.has_substructure=True
                 objstream.append(sub_elems)
                 # inline offset adjustment
             elif e.get_tag_try_anyway():
@@ -176,6 +222,7 @@ class ASN1Parse(object):
                 self._pushad()
                 try:
                     sub_elems=self._parse(e.value)
+                    e.has_substructure=True
                     objstream.append(sub_elems)
                     self._clr()
                 except (StopIteration, OverflowError) as ex:
@@ -189,28 +236,63 @@ class ASN1Parse(object):
         return objstream 
     
 
+    def serialize(self, objstream):
+        '''
+        convert objstream to binary stream
+        '''
+        return self._serialize(objstream)
+        
+
+    def _serialize(self, objstream):
+        rv = ''
+        if objstream==None:
+            return rv
+        if isinstance(objstream,list):
+            # more items to come, reurse
+            for o in objstream:
+                rv+=self._serialize(o)
+        else:
+            # ASN1Element.serialize()
+            rv += objstream.serialize()
+        return rv
+        
+    
+
 class Certificate(object):
     
     REX_PEM = re.compile("\-+BEGIN [\d\w\s\.]+\-+(.*?)\-+END [\d\w\s\.]+\-+",re.MULTILINE|re.DOTALL)
         
-    def __init__(self,file):
-        self.load(file)
+    def __init__(self):
+        self.data=None
+        self.data_decoded=None
         
-    def load(self, file):
-        with open(file,'r') as f:
-            data=f.read()
-            
-        pem = self.REX_PEM.search(data)
+    def loadasn(self, asn):
+        self.data=asn
+        
+    def loads(self, str):
+        pem = self.REX_PEM.search(str)
         if not pem:
             raise Exception("not in pem format")
         
         pem = pem.group(1)
         pem = pem.replace("\n","")
         self.data=pem.decode("base64")
-        print hashlib.sha256(self.data).hexdigest()
+        print hashlib.sha256(self.data).hexdigest()        
+        
+    def load(self, file):
+        with open(file,'r') as f:
+            data=f.read()
+            
+        return self.loads(data)
+
     
-    def decode(self):
-        return ASN1Parse(self.data).parse()
+    def decode(self, data=None):
+        data = data or self.data
+        return ASN1Parse(data).parse()
+    
+    def encode(self, data=None):
+        data=data or self.data
+        return ASN1Parse().serialize(data)
     
     def to_binary(self):
         return self.data
@@ -224,8 +306,19 @@ class Certificate(object):
     
     
 if __name__=='__main__':
-    c = Certificate("C:\\_tmp\\google.lpem.cer")
+    c = Certificate()
+    c.load("C:\\_tmp\\google.lpem.cer")
     print c.to_pem()
     print c.to_binary()
+    objstream = c.decode()
     import pprint
-    pprint.pprint(c.decode())
+    pprint.pprint(objstream)
+    raw_input("--next--")
+    der=c.encode(objstream)
+    print repr(der)
+    cb = Certificate()
+    cb.loadasn(der)
+    with open("C:\\_tmp\\recode2.pem",'w') as f:
+        f.write(cb.to_pem(der))
+    pprint.pprint(cb.decode())
+    
