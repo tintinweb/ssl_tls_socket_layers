@@ -256,6 +256,18 @@ class ASN1Parse(object):
             rv += objstream.serialize()
         return rv
         
+    def _find(self, objstream, tag, value):
+        if objstream==None:
+            return None
+        if isinstance(objstream,list):
+            for o in objstream:
+                io = self._find(o,tag,value)
+                if io!=None:
+                    objstream = io
+                    break
+        if tag==objstream.tag and value in objstream.value:
+            return objstream
+        return None
     
 
 class Certificate(object):
@@ -314,11 +326,19 @@ if __name__=='__main__':
     import pprint
     pprint.pprint(objstream)
     raw_input("--next--")
+    # manipulate asn1element
+    x = ASN1Parse()._find(objstream, tag=0x86, value="pki.google.com")
+    print x
+    x.value="http://pki.tintin.com/?45678901"
+    print x
+    raw_input("--")
     der=c.encode(objstream)
     print repr(der)
+    # serialize objectstream to pem
     cb = Certificate()
     cb.loadasn(der)
     with open("C:\\_tmp\\recode2.pem",'w') as f:
         f.write(cb.to_pem(der))
     pprint.pprint(cb.decode())
+    
     
