@@ -44,8 +44,9 @@ class DTLSHandshake(layer.ssl.tls.TLSHandshake):
         
 class DTLSClientHello(Layer):
      
-    MAGIC = DTLSHandshake.TYPE_CLIENT_HELLO
+    
     def _definition(self):
+        self.MAGIC = DTLSHandshake.TYPE_CLIENT_HELLO
         self.add_field(name='version', struct='!H', default=DTLSRecord.PROTOCOL_DTLS_1_0)
         #
         self.add_field(name='random', default=layer.ssl.tls.TLSPropRandom())
@@ -62,8 +63,9 @@ class DTLSClientHello(Layer):
 
 class DTLSHelloVerify(Layer):
     
-    MAGIC = DTLSHandshake.TYPE_HELLO_VERIFY
+    
     def _definition(self):
+        self.MAGIC = DTLSHandshake.TYPE_HELLO_VERIFY
         self.add_field(name='version', struct='!H', default=DTLSRecord.PROTOCOL_DTLS_1_0)    
         self.add_field(name='cookie', default=DTLSPropCookie())
         
