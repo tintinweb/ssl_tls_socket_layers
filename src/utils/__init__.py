@@ -17,4 +17,4 @@ def hexdump_squashed(s):
             pdat = ''.join((c if 32 <= ord(c) <= 126 else '.' )for c in lin)
             allnulls = 0
         print '  %04x: %-48s %s' % (b, hxdat, pdat)
-    print 
+    print

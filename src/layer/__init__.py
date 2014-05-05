@@ -52,17 +52,23 @@ class FieldDict(OrderedDict):
         OrderedDict.__setitem__(self, key, value)
 
 class Field(object):
-    def __init__(self, name, struct=None, default=None, value=None, valid=None):
+    def __init__(self, name, struct=None, default=None, value=None, allowed=None):
         self.name = name
         self.struct = struct
         self.default = default
         self.set(value)
+        self.allowed = allowed
         
     def set(self, value):
         self.value = value
         
     def getValue(self, value=None):
-        return value if value!=None else (self.value or self.default)
+        if value!=None:
+            return value
+        elif self.value!=None:
+            return self.value
+        else:
+            return self.default
         
     def get(self, value=None):
         #print "[F] ->"+self.name
@@ -80,16 +86,13 @@ class Field(object):
                 ret+=self.get(e)        # deref/serialize list items
         else:
             #print "[F] raw"
-            ret = value
-                
+            ret = value            
         return ret
-    
-
     
     def serialize(self):
         value = self.get()
-
-        print repr(self)
+        #print repr(value)
+        #print repr(self)
         
         if self.struct:
             return Packer.pack(self.struct, value)
@@ -101,36 +104,35 @@ class Field(object):
         self.value = struct.unpack(self.struct,data[:size])[0]
         return size
         
-    def __repr__(self):
+    def __str__(self):
         return "[F]   %-20s : %-5s %-10s"%(self.name,self.struct,self.get())
     
     def __len__(self):
         return len(self.serialize())
 
+class NoneLayer(object):
+    '''
+    dummy termination layer
+    '''
+    def __init__(self):
+        self.MAGIC = 0x00
+        super(NoneLayer,self).__init__()
+        self.length=0
+    def next_size(self):
+        raise
+    def next_magic(self):
+        raise
+    def magic(self):
+        return self.MAGIC
+    def size(self):
+        return self.length
 
-class Layer(object):
-    class NoneLayer(object):
-        '''
-        dummy termination layer
-        '''
-        def __init__(self):
-            self.length=0
-        def size(self):
-            print "DUMMY"
-            #raise
-            return self.length
-        def magic(self):
-            print "DUMMY_TYPE"
-            return 0x00
-        def next_size(self):
-            raise
-        def next_magic(self):
-            raise
-        
-    MAGIC = 0x00
-        
+
+class Layer(object):        
+   
     def __init__(self, **kwargs):
-        self.next = Layer.NoneLayer()           # previous -- linked by / operator
+        self.MAGIC = 0x00
+        self.next = NoneLayer()           # previous -- linked by / operator
         self.next_layer_len=0
         self.length=0
         self.prev = None                        # next layer
@@ -194,6 +196,7 @@ class Layer(object):
         for field in self.fields.values():
             #print "[L]"+ field.name
             self.data_serialized += field.serialize()
+            
         return self.data_serialized
     
     def unserialize(self, data):
@@ -221,10 +224,31 @@ class Layer(object):
     
     def total_len(self):
         return len(self)+self.next_len()
+    
+    def hexdump(self):
+        rv = ''
+        allnulls = 0
+        s = self.serialize()
+        for b in xrange(0, len(s), 16):
+            lin = [c for c in s[b : b + 16]]
+            hxdat = ' '.join('%02X' % ord(c) for c in lin)
+            if hxdat == "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00":
+                if allnulls == 1:
+                    continue
+                hxdat = '...'
+                allnulls = 1
+                pdat = ''
+            else:
+                pdat = ''.join((c if 32 <= ord(c) <= 126 else '.' )for c in lin)
+                allnulls = 0
+            rv+= '\n  %04x: %-48s %s' % (b, hxdat, pdat)
+        rv+="\n"
+        return rv
+
 
     
 from utils import *    
-class CompoundLayer(Layer.NoneLayer):       # fix remove?
+class CompoundLayer(NoneLayer):       # fix remove?
     '''
     
     track and handle /concatenations and provide interface for easy serialization
@@ -239,7 +263,6 @@ class CompoundLayer(Layer.NoneLayer):       # fix remove?
         self.list[-1].next = other
         other.prev = self.list[-1]
         self.list.append(other)
-        
         return self
     
     def __add__(self, other):
@@ -250,7 +273,6 @@ class CompoundLayer(Layer.NoneLayer):       # fix remove?
     
     def __repr__(self):
         return self.__class__.__name__+"|"+str(self.list)
-        return self.__str__()
 
     def size(self):
         return len(self.serialize())
@@ -276,6 +298,10 @@ class CompoundLayerDiv(CompoundLayer):
         hexdump_squashed(ret)
         return ret
     
+    def next(self):
+        for layer in reversed(self.list):
+            yield layer
+    
 class CompoundLayerAdd(CompoundLayer):
     
     def serialize(self):
@@ -291,5 +317,8 @@ class CompoundLayerAdd(CompoundLayer):
             ret +=  data
             
         hexdump_squashed(ret)
-        return ret       
+        return ret
     
+    def next(self):
+        for layer in self.list:
+            yield layer     

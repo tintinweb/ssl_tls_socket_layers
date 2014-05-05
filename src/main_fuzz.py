@@ -18,7 +18,7 @@ from layer.ssl.tls import *
 from layer.base import Raw,TCP,UDP
 
 import sys
-
+import fuzzer
 
 
 def main(opts):
@@ -26,25 +26,21 @@ def main(opts):
     port = opts['port']
     print ip,port
 
-    tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)
-
-
-            
+    fuzz = fuzzer.Fuzzer()
+    tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024, timeout=0.5)
+    p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(data=TLSClientHello(version=TLSRecord.PROTOCOL_TLS_1_1))
+    resp = tcp/Raw(data=p)
+ 
+    for pf in fuzz.mutate_layer(p):
+        print "X",pf
+        tcp = TCP(ip="172.16.0.55", port=443, buffer=16*1024)
+        resp = tcp/Raw(data=pf)
     
-    ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList()+
-                                        TLSExtension()/TLSSessionTicket(data='N'*15+"I"*15+'\x00\x20'+'T'*0x20)+
-                                        TLSExtension()/TLSHeartBeat.Handshake())
-
-    #p =  TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake()/TLSClientHello()
-
-    p = TLSRecord(version=TLSRecord.PROTOCOL_TLS_1_0)/TLSHandshake(data=TLSClientHello(version=TLSRecord.PROTOCOL_TLS_1_1,extensions=ext))
-    resp = tcp/Raw(data=p.serialize())
-    
-    try:
-        resp = TLSRecord(__raw=resp)
-    except:
-        print "resp - not a tlsRecord structure"
-    print resp
+        try:
+            resp = TLSRecord(__raw=resp)
+        except:
+            print "resp - not a tlsRecord structure"
+        print resp
     exit()
     
     

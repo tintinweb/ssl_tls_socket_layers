@@ -8,12 +8,12 @@ import time, os
 
 
 class TLSRecord(Layer):
-    CONTENT_TYPE_CHANGE_CIPHER_SPEC = 20
-    CONTENT_TYPE_ALERT = 21
-    CONTENT_TYPE_HANDSHAKE = 22
-    CONTENT_TYPE_APPLICATION_DATA = 23
-    CONTENT_TYPE_HEARTBEAT = 24
-    CONTENT_TYPE_UNKNOWN_255 = 255
+    TYPE_CHANGE_CIPHER_SPEC = 20
+    TYPE_ALERT = 21
+    TYPE_HANDSHAKE = 22
+    TYPE_APPLICATION_DATA = 23
+    TYPE_HEARTBEAT = 24
+    TYPE_UNKNOWN_255 = 255
     
     PROTOCOL_SSL_3_0 = 0x0300
     PROTOCOL_TLS_1_0 = 0x0301
@@ -23,8 +23,8 @@ class TLSRecord(Layer):
     def _definition(self):
         # fields and their wire-definition
         # in order!
-        self.add_field(name='content_type', struct='!B', default=self.next_magic)
-        self.add_field(name='version', struct='!H', default=self.PROTOCOL_TLS_1_0)
+        self.add_field(name='type', struct='!B', default=self.next_magic, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TYPE_")])
+        self.add_field(name='version', struct='!H', default=self.PROTOCOL_TLS_1_0, allowed=[getattr(self,t) for t in dir(self) if t.startswith("PROTOCOL_")])
         self.add_field(name='length', struct='!H', default=self.next_size)
         
 class TLSHandshake(Layer):
@@ -43,14 +43,15 @@ class TLSHandshake(Layer):
     TYPE_UNKNOWN_255 = 0xff
      
      
-    MAGIC = TLSRecord.CONTENT_TYPE_HANDSHAKE
+    
     def _definition(self):
+        self.MAGIC = TLSRecord.TYPE_HANDSHAKE
         
-        self.add_field(name='type', struct='!B', default=self.next_magic)          #client hello
+        self.add_field(name='type', struct='!B', default=self.next_magic, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TYPE_")])          #client hello
         #self.add_field(name='length_hi', struct='!B', default=0x00)  #fix!
         self.add_field(name='length', struct='!I{3}', default=self.get_handshake_length) #+2
         
-        self.add_field(name='data', default=TLSClientHello())
+        self.add_field(name='data', default=TLSClientHello(), allowed=[TLSClientHello,TLSServerHello,TLSCertificate,TLSServerKeyExchange,TLSServerHelloDone])
         
     def next_magic(self):
         return self.fields['data'].getValue().MAGIC
@@ -80,43 +81,48 @@ class TLSHandshake(Layer):
 
 class TLSClientHello(Layer):
      
-    MAGIC = TLSHandshake.TYPE_CLIENT_HELLO
+    
     def _definition(self):
-        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
+        self.MAGIC = TLSHandshake.TYPE_CLIENT_HELLO
+        
+        
+        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1, allowed=[getattr(TLSRecord,t) for t in dir(TLSRecord) if t.startswith("PROTOCOL_")])
         #
-        self.add_field(name='random', default=TLSPropRandom())
+        self.add_field(name='random', default=TLSPropRandom(), allowed=[TLSPropRandom])
         #
-        self.add_field(name='session_id', struct='!B', default=0)
+        self.add_field(name='session_id', default=TLSPropSessionId(), allowed=[TLSPropSessionId])
         #
-        self.add_field(name='cipher_suites', default=TLSPropCipherSuites())
+        self.add_field(name='cipher_suites', default=TLSPropCipherSuites(), allowed=[TLSPropCipherSuites])
         #
-        self.add_field(name='compression_methods', default=TLSPropCompressionMethod())
+        self.add_field(name='compression_methods', default=TLSPropCompressionMethod(), allowed=[TLSPropCompressionMethod])
         #
-        self.add_field(name='extensions', default=TLSExtensionList())
+        self.add_field(name='extensions', default=TLSExtensionList(), allowed=[TLSExtensionList])
 
 class TLSServerHello(Layer):
      
-    MAGIC = TLSHandshake.TYPE_SERVER_HELLO
+   
     def _definition(self):
-        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1)
+        self.MAGIC = TLSHandshake.TYPE_SERVER_HELLO
+        self.add_field(name='version', struct='!H', default=TLSRecord.PROTOCOL_TLS_1_1, allowed=[getattr(TLSRecord,t) for t in dir(TLSRecord) if t.startswith("PROTOCOL_")])
         #
-        self.add_field(name='random', default=TLSPropRandom())
+        self.add_field(name='random', default=TLSPropRandom(), allowed=[TLSPropRandom])
         #
-        self.add_field(name='session_id', struct='!B', default=0)
+        self.add_field(name='session_id', default=TLSPropSessionId(), allowed=[TLSPropSessionId])
         #
         self.add_field(name='cipher_suite', struct='!H', default=TLSPropCipherSuites.TLS_NULL_WITH_NULL_NULL)
         #
         self.add_field(name='compression_method', struct='!B', default=TLSPropCompressionMethod.TLS_COMPRESS_NULL)
         #
-        self.add_field(name='extensions', default=TLSExtensionList())
+        self.add_field(name='extensions', default=TLSExtensionList(), allowed=[TLSExtensionList])
         
 class TLSCertificate(Layer):
      
-    MAGIC = TLSHandshake.TYPE_CERTIFICATE
+    
     def _definition(self):
+        self.MAGIC = TLSHandshake.TYPE_CERTIFICATE
         self.add_field(name='length', struct='!I{3}', default=self.get_certificates_length)
         #
-        self.add_field(name='certificates', default=TLSPropCertificate())
+        self.add_field(name='certificates', default=TLSPropCertificate(), allowed=[TLSPropCertificate])
         
     def get_certificates_length(self):
         return len(self.fields['certificates'])
@@ -131,8 +137,9 @@ class TLSPropCertificate(Layer):
         
 class TLSServerKeyExchange(Layer):
      
-    MAGIC = TLSHandshake.TYPE_SERVER_KEY_EXCHANGE
+    
     def _definition(self):
+        self.MAGIC = TLSHandshake.TYPE_SERVER_KEY_EXCHANGE
         self.add_field(name='length', struct='!I{3}', default=self.get_ske_length)
         #
         self.add_field(name='data', default=os.urandom(329))
@@ -142,11 +149,20 @@ class TLSServerKeyExchange(Layer):
         
 class TLSServerHelloDone(Layer):
     
-    MAGIC = TLSHandshake.TYPE_SERVER_HELLO_DONE
+    
     def _definition(self):
+        self.MAGIC = TLSHandshake.TYPE_SERVER_HELLO_DONE
         self.add_field(name='length', struct='!I{3}', default=self.get_data_length)
         #
         self.add_field(name='data', default='')
+        
+    def get_data_length(self):
+        return len(self.fields['data'])
+        
+class TLSPropSessionId(Layer):
+    def _definition(self):
+        self.add_field(name="length", struct='!B', default=self.get_data_length)
+        self.add_field(name="data", default='')
         
     def get_data_length(self):
         return len(self.fields['data'])
@@ -215,7 +231,7 @@ class TLSPropCipherSuites(Layer):
     
     def _definition(self):
         self.add_field(name="length", struct='!H', default=self.cipher_list_length)
-        self.add_field(name="cipher_suites",  default=self.ciphers_all)
+        self.add_field(name="cipher_suites",  default=self.ciphers_all, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TLS_")])
         
     def ciphers_all(self):
         return "".join( [struct.pack('!H',getattr(self,c)) for c in dir(self) if c.startswith("TLS_")])
@@ -230,7 +246,7 @@ class TLSPropCompressionMethod(Layer):
     
     def _definition(self):
         self.add_field(name="length", struct='!B', default=self.compress_list_length)
-        self.add_field(name="compression_methods", default=self.compress_all)
+        self.add_field(name="compression_methods", default=self.compress_all, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TLS_")])
         
     def compress_all(self):
         return "".join( [struct.pack('!B',getattr(self,c)) for c in dir(self) if c.startswith("TLS_")])
@@ -242,7 +258,7 @@ class TLSPropCompressionMethod(Layer):
 class TLSExtensionList(Layer):
     def _definition(self):
         self.add_field(name="length", struct='!H', default=self.get_extensions_length)
-        self.add_field(name="extensions",  default=self.get_extensions)
+        self.add_field(name="extensions",  default=self.get_extensions, allowed=[TLSExtension])
         
     def get_extensions(self):
         exts = [
@@ -274,13 +290,14 @@ class TLSExtension(Layer):
     def _definition(self):
         # fields and their wire-definition
         # in order!
-        self.add_field(name='type', struct='!H', default=self.next_magic)
+        self.add_field(name='type', struct='!H', default=self.next_magic, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TYPE_")])
         self.add_field(name='length', struct='!H', default=self.next_size)        # next layer length
     
 class TLSSessionTicket(Layer):
     
-    MAGIC = TLSExtension.TYPE_SESSION_TICKET_TLS
+    
     def _definition(self):
+        self.MAGIC = TLSExtension.TYPE_SESSION_TICKET_TLS
         #type + length from TLSExtension
         self.add_field(name='data', default='')          
        
@@ -305,13 +322,14 @@ class TLSServerNameList(Layer):
               ServerName server_name_list<1..2^16-1>
           } ServerNameList;
     '''
-    MAGIC = TLSExtension.TYPE_SERVER_NAME    # previous.next.magic()
+    
     
     def _definition(self):
+        self.MAGIC = TLSExtension.TYPE_SERVER_NAME    # previous.next.magic()
         # fields and their wire-definition
         # in order!
         self.add_field(name='length', struct='!H', default=self.get_name_list_len)
-        self.add_field(name='name_list', default=self.get_name_list)
+        self.add_field(name='name_list', default=self.get_name_list, allowed=[TLSServerName])
         
     def get_name_list(self):
         return TLSServerName(type=TLSServerName.TYPE_HOST, data="a.yimg.com")  
@@ -330,7 +348,7 @@ class TLSServerName(Layer):
     def _definition(self):
         # fields and their wire-definition
         # in order!
-        self.add_field(name='type', struct='!B', default=self.TYPE_HOST)
+        self.add_field(name='type', struct='!B', default=self.TYPE_HOST, allowed=[getattr(self,t) for t in dir(self) if t.startswith("TYPE_")])
         self.add_field(name='length', struct='!H', default=self.get_name_len)
         self.add_field(name='data', default='')
         
@@ -339,15 +357,17 @@ class TLSServerName(Layer):
  
 
 class TLSHeartBeat(Layer): 
-    MAGIC = TLSRecord.CONTENT_TYPE_HEARTBEAT
+   
       
     class Handshake(Layer):
         
-        MAGIC = TLSExtension.TYPE_HEARTBEAT
+        
         def _definition(self):
+            self.MAGIC = TLSExtension.TYPE_HEARTBEAT
             self.add_field(name='mode', struct="!B", default=0x01)       
          
     def _definition(self):
+        self.MAGIC = TLSRecord.TYPE_HEARTBEAT
         # fields and their wire-definition
         # in order!
         self.add_field(name='HeartbeatMessageType', struct='!B', default=0x01)
@@ -395,20 +415,23 @@ class TLSAlert(Layer):
     DESCRIPTION_UNKNOWN_255 = 255
     
     
-    MAGIC = TLSRecord.CONTENT_TYPE_ALERT
+    
     
     def _definition(self):
+        self.MAGIC = TLSRecord.TYPE_ALERT
         # fields and their wire-definition
         # in order!
-        self.add_field(name='level', struct='!B', default=self.length)
-        self.add_field(name='description', struct='!B', default=self.DESCRIPTION_CLOSE_NOTIFY)
-    
-    
+        self.add_field(name='level', struct='!B', default=self.length, allowed=[getattr(self,t) for t in dir(self) if t.startswith("LEVEL_")])
+        self.add_field(name='description', struct='!B', default=self.DESCRIPTION_CLOSE_NOTIFY, allowed=[getattr(self,t) for t in dir(self) if t.startswith("DESCRIPTION_")])    
+
+
 if __name__=="__main__":
     #hexdump_squashed(TLSExtension()/TLSServerNameList())
     print "------tin"
+    x=TLSHandshake()
+    print repr(x.serialize())
     
-    hexdump_squashed(TLSHandshake(data=TLSClientHello()))
+    hexdump_squashed(x)
     exit()
 
     ext = TLSExtensionList(extensions=TLSExtension()/TLSServerNameList())
